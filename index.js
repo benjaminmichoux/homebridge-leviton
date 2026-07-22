@@ -9,6 +9,7 @@ class LevitonDecoraSmartPlatform {
     this.config = config
     this.api = api
     this.accessories = []
+    this.token = null
 
     const noop = function () {}
     const logger = (level) => (msg) =>
@@ -37,6 +38,15 @@ class LevitonDecoraSmartPlatform {
       const excludedModels = (config.excludedModels || []).map((name) => name.toUpperCase())
       const excludedSerials = (config.excludedSerials || []).map((name) => name.toUpperCase())
       if (Array.isArray(devices) && devices.length > 0) {
+        // Set up accessories restored from cache with the fresh token (their
+        // cached token has since expired). Refresh their device data too.
+        for (const accessory of this.accessories) {
+          const device = devices.find((d) => d.serial === accessory.context.device.serial)
+          if (device) accessory.context.device = device
+          accessory.context.token = token
+          await this.setupService(accessory)
+        }
+        // Add any newly discovered devices not already restored from cache.
         devices.forEach((device) => {
           if (!this.accessories.find((acc) => acc.context.device.serial === device.serial)) {
             if (!excludedModels.includes(device.model) && !excludedSerials.includes(device.serial)) {
@@ -81,6 +91,7 @@ class LevitonDecoraSmartPlatform {
         password: this.config['password'],
       })
       var { id: token, userId: personID } = login
+      this.token = token
       this.log.debug(`personID: ${personID}, hasToken: ${!!token}`)
     } catch (err) {
       this.log.error(`Failed to login to leviton: ${err.message}`)
@@ -176,13 +187,13 @@ class LevitonDecoraSmartPlatform {
 
   async configureAccessory(accessory) {
     this.log.debug(`configureAccessory: ${accessory.displayName}`)
-    await this.setupService(accessory)
+    // Defer service setup until didFinishLaunching, once we have a fresh token.
     this.accessories.push(accessory)
   }
 
-  async getStatus(device, token) {
+  async getStatus(device) {
     this.log.debug(`getStatus: ${device.name}`)
-    return Leviton.getIotSwitch({ switchID: device.id, token })
+    return Leviton.getIotSwitch({ switchID: device.id, token: this.token })
   }
 
   async setupService(accessory) {
@@ -218,21 +229,20 @@ class LevitonDecoraSmartPlatform {
     this.log.debug(`Setting up device as Switch: ${accessory.displayName}`)
 
     const device = accessory.context.device
-    const token = accessory.context.token
-    const status = await this.getStatus(device, token)
+    const status = await this.getStatus(device)
 
     const service = accessory.getService(Service.Switch) || accessory.addService(Service.Switch, device.name)
 
     service
       .getCharacteristic(Characteristic.On)
       .onGet(async () => {
-        const res = await Leviton.getIotSwitch({ switchID: device.id, token })
+        const res = await Leviton.getIotSwitch({ switchID: device.id, token: this.token })
         this.log.debug(`onGetPower: ${device.name} ${res.power}`)
         return res.power === 'ON'
       })
       .onSet(async (value) => {
-        const res = await Leviton.putIotSwitch({ switchID: device.id, power: value ? 'ON' : 'OFF', token })
-        this.log.info(`onSetPower: ${device.name} ${res.power}`)
+        await Leviton.putIotSwitch({ switchID: device.id, power: value ? 'ON' : 'OFF', token: this.token })
+        this.log.info(`onSetPower: ${device.name} ${value ? 'ON' : 'OFF'}`)
       })
       .updateValue(status.power === 'ON')
   }
@@ -241,21 +251,20 @@ class LevitonDecoraSmartPlatform {
     this.log.debug(`Setting up device as Outlet: ${accessory.displayName}`)
 
     const device = accessory.context.device
-    const token = accessory.context.token
-    const status = await this.getStatus(device, token)
+    const status = await this.getStatus(device)
 
     const service = accessory.getService(Service.Outlet) || accessory.addService(Service.Outlet, device.name)
 
     service
       .getCharacteristic(Characteristic.On)
       .onGet(async () => {
-        const res = await Leviton.getIotSwitch({ switchID: device.id, token })
+        const res = await Leviton.getIotSwitch({ switchID: device.id, token: this.token })
         this.log.debug(`onGetPower: ${device.name} ${res.power}`)
         return res.power === 'ON'
       })
       .onSet(async (value) => {
-        const res = await Leviton.putIotSwitch({ switchID: device.id, power: value ? 'ON' : 'OFF', token })
-        this.log.info(`onSetPower: ${device.name} ${res.power}`)
+        await Leviton.putIotSwitch({ switchID: device.id, power: value ? 'ON' : 'OFF', token: this.token })
+        this.log.info(`onSetPower: ${device.name} ${value ? 'ON' : 'OFF'}`)
       })
       .updateValue(status.power === 'ON')
   }
@@ -264,34 +273,33 @@ class LevitonDecoraSmartPlatform {
     this.log.debug(`Setting up device as Lightbulb: ${accessory.displayName}`)
 
     const device = accessory.context.device
-    const token = accessory.context.token
-    const status = await this.getStatus(device, token)
+    const status = await this.getStatus(device)
 
     const service = accessory.getService(Service.Lightbulb) || accessory.addService(Service.Lightbulb, device.name)
 
     service
       .getCharacteristic(Characteristic.On)
       .onGet(async () => {
-        const res = await Leviton.getIotSwitch({ switchID: device.id, token })
+        const res = await Leviton.getIotSwitch({ switchID: device.id, token: this.token })
         this.log.debug(`onGetPower: ${device.name} ${res.power}`)
         return res.power === 'ON'
       })
       .onSet(async (value) => {
-        const res = await Leviton.putIotSwitch({ switchID: device.id, power: value ? 'ON' : 'OFF', token })
-        this.log.info(`onSetPower: ${device.name} ${res.power}`)
+        await Leviton.putIotSwitch({ switchID: device.id, power: value ? 'ON' : 'OFF', token: this.token })
+        this.log.info(`onSetPower: ${device.name} ${value ? 'ON' : 'OFF'}`)
       })
       .updateValue(status.power === 'ON')
 
     service
       .getCharacteristic(Characteristic.Brightness)
       .onGet(async () => {
-        const res = await Leviton.getIotSwitch({ switchID: device.id, token })
+        const res = await Leviton.getIotSwitch({ switchID: device.id, token: this.token })
         this.log.debug(`onGetBrightness: ${device.name} @ ${res.brightness}%`)
         return res.brightness
       })
       .onSet(async (brightness) => {
-        const res = await Leviton.putIotSwitch({ switchID: device.id, brightness, token })
-        this.log.info(`onSetBrightness: ${device.name} @ ${res.brightness}%`)
+        await Leviton.putIotSwitch({ switchID: device.id, brightness, token: this.token })
+        this.log.info(`onSetBrightness: ${device.name} @ ${brightness}%`)
       })
       .setProps({ minValue: status.minLevel, maxValue: status.maxLevel, minStep: 1 })
       .updateValue(status.brightness)
@@ -301,34 +309,33 @@ class LevitonDecoraSmartPlatform {
     this.log.debug(`Setting up device as Fan: ${accessory.displayName}`)
 
     const device = accessory.context.device
-    const token = accessory.context.token
-    const status = await this.getStatus(device, token)
+    const status = await this.getStatus(device)
 
     const service = accessory.getService(Service.Fan) || accessory.addService(Service.Fan, device.name)
 
     service
       .getCharacteristic(Characteristic.On)
       .onGet(async () => {
-        const res = await Leviton.getIotSwitch({ switchID: device.id, token })
+        const res = await Leviton.getIotSwitch({ switchID: device.id, token: this.token })
         this.log.debug(`onGetPower: ${device.name} ${res.power}`)
         return res.power === 'ON'
       })
       .onSet(async (value) => {
-        const res = await Leviton.putIotSwitch({ switchID: device.id, power: value ? 'ON' : 'OFF', token })
-        this.log.info(`onSetPower: ${device.name} ${res.power}`)
+        await Leviton.putIotSwitch({ switchID: device.id, power: value ? 'ON' : 'OFF', token: this.token })
+        this.log.info(`onSetPower: ${device.name} ${value ? 'ON' : 'OFF'}`)
       })
       .updateValue(status.power === 'ON')
 
     service
       .getCharacteristic(Characteristic.RotationSpeed)
       .onGet(async () => {
-        const res = await Leviton.getIotSwitch({ switchID: device.id, token })
+        const res = await Leviton.getIotSwitch({ switchID: device.id, token: this.token })
         this.log.debug(`onGetRotationSpeed: ${device.name} @ ${res.brightness}%`)
         return res.brightness
       })
       .onSet(async (brightness) => {
-        const res = await Leviton.putIotSwitch({ switchID: device.id, brightness, token })
-        this.log.info(`onSetRotationSpeed: ${device.name} @ ${res.brightness}%`)
+        await Leviton.putIotSwitch({ switchID: device.id, brightness, token: this.token })
+        this.log.info(`onSetRotationSpeed: ${device.name} @ ${brightness}%`)
       })
       .setProps({ minValue: 0, maxValue: status.maxLevel, minStep: status.minLevel })
       .updateValue(status.brightness)
