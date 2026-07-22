@@ -1,6 +1,6 @@
 let Service, Characteristic, Accessory, UUID
 const Leviton = require('./api.js')
-const PLUGIN_NAME = 'homebridge-leviton'
+const PLUGIN_NAME = '@benjaminmichoux/homebridge-leviton'
 const PLATFORM_NAME = 'LevitonDecoraSmart'
 const levels = ['debug', 'info', 'warn', 'error']
 
