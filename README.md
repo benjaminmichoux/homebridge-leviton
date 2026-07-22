@@ -15,6 +15,11 @@ These models are tested, though any other WiFi model should work.
 - DW15P Wi-Fi Plugin Outlet
 - DW4SF Fan Speed Controller
 
+## Requirements
+
+- Node.js 18, 20, or 22
+- Homebridge 1.8+ or 2.x
+
 ## Setup
 
 _You must use the main "My Leviton" login credentials._
@@ -22,23 +27,30 @@ _You must use the main "My Leviton" login credentials._
 - add `homebridge-leviton` in your Homebridge Config UI X web interface
 - Add to your config.json:
 
-```
+```json
 "platforms": [
   {
     "platform": "LevitonDecoraSmart",
     "email": "your@email.com",
-    "password": "supersecretpassword"
-    "loglevel": "info" // optional, info is default. debug for more, warn or error for less
-    "excludedModels": ["DWP15"] // optional, use this to exclude entire models like fully HomeKit compatible devices
-    "excludedSerials": ["1000_0023_CCE2"] //optional, use this to exclude just one device
+    "password": "supersecretpassword",
+    "loglevel": "info",
+    "excludedModels": ["DWP15"],
+    "excludedSerials": ["1000_0023_CCE2"]
   }
 ]
 ```
 
+| Option | Required | Default | Description |
+|--------|----------|---------|-------------|
+| `email` | yes | — | My Leviton account email |
+| `password` | yes | — | My Leviton account password |
+| `loglevel` | no | `info` | `debug`, `info`, `warn`, or `error` |
+| `excludedModels` | no | `[]` | Skip entire model families (e.g. fully HomeKit-native devices) |
+| `excludedSerials` | no | `[]` | Skip individual devices by serial number |
+
 ## Features
 
-- Automatically discovers devices on your My Leviton app
-- On/Off
-- Brightness (max + min limits)
-- Shows serial/model number
-- varying log level independent of homebridge
+- Automatically discovers devices on your My Leviton account
+- On/Off, Brightness (with min/max limits), Fan speed
+- Real-time state updates via WebSocket (auto-reconnects on connection drop)
+- Shows serial/model/firmware in HomeKit accessory info

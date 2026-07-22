@@ -21,16 +21,23 @@
           "type": "password"
         }
       },
+      "loglevel": {
+        "title": "Log Level",
+        "type": "string",
+        "default": "info",
+        "enum": ["debug", "info", "warn", "error"],
+        "description": "Verbosity of plugin logging. Default is info."
+      },
       "excludedModels": {
         "type": "array",
-        "description": "List of models to be excluded",
+        "description": "List of device models to exclude (e.g. fully HomeKit-native devices)",
         "items": {
           "type": "string"
         }
       },
       "excludedSerials": {
         "type": "array",
-        "description": "List of models to be excluded",
+        "description": "List of device serial numbers to exclude",
         "items": {
           "type": "string"
         }
